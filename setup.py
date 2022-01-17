@@ -2,6 +2,7 @@ import os
 import sys
 
 from setuptools import setup
+
 try:
     from sphinx.setup_command import BuildDoc
 except ImportError:
