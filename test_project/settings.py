@@ -99,3 +99,6 @@ EXPLORER_TRANSFORMS = (
 EXPLORER_USER_QUERY_VIEWS = {}
 EXPLORER_TASKS_ENABLED = True
 EXPLORER_S3_BUCKET = 'thisismybucket.therearemanylikeit.butthisoneismine'
+EXPLORER_S3_REGION = 'eu-west-1'
+EXPLORER_S3_ACL = 'public-read'
+EXPLORER_S3_CACHE_CONTROL = 'no-cache'

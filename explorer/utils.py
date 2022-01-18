@@ -172,20 +172,170 @@ def get_valid_connection(alias=None):
     return connections[alias]
 
 
-def get_s3_bucket():
-    from boto.s3.connection import S3Connection
+class Undefined:
+    """Placeholder for undefined values (can't use None)"""
 
-    conn = S3Connection(app_settings.S3_ACCESS_KEY,
-                        app_settings.S3_SECRET_KEY)
-    return conn.get_bucket(app_settings.S3_BUCKET)
+
+def dictattr(dict_, name, default=Undefined()):
+    """
+    Given a dotted path as name, return the nested value from the dict,
+    returning the default if not found, or raising AttributeError if the
+    path is not found.
+
+    :param dict_: the dict containing the values
+    :type dict_: dict
+    :param name: dotted-path of the value to return from the dict
+    :type name: str
+    :param default: default value to return if the named value is not found,
+                    if not specified, we'll return
+    :type default: Undefined or value
+    :return: the result of following the dotted-path through dict to resolve
+             a target value
+    :raise AttributeError: if the named value is not found in the dict and no
+                           default value is specified.
+    """
+    components = name.split('.')
+    result = dict_
+    for component in components:
+        if component not in result:
+            if isinstance(default, Undefined):
+                raise AttributeError()
+            return default
+        result = result[component]
+    return result
+
+
+def s3_get_client():
+    try:
+        # Optional dependency
+        import boto3
+
+        return boto3.client(
+            "s3",
+            region_name=app_settings.S3_REGION,
+            aws_access_key_id=app_settings.S3_ACCESS_KEY,
+            aws_secret_access_key=app_settings.S3_SECRET_KEY
+        )
+    except ImportError:
+        return None
+
+
+def s3_put_object_from_file(
+        bucket,
+        key,
+        content,
+        content_type,
+        content_encoding=None,
+        content_disposition=None,
+        acl=app_settings.S3_ACL,
+        cache_control=app_settings.S3_CACHE_CONTROL,
+        cb=None,
+):
+    """
+    Put an object onto S3 in the specified bucket under the specified key
+    using in-memory content.
+
+    :param bucket: the bucket name
+    :type bucket: str
+    :param key: the key to store the new object under in the bucket
+    :type key: str
+    :param content: the content of the new object, as either a file-name or a
+                    file-like object
+    :type content: str or object
+    :param content_type: the MIME type of the content along with any character
+                         encoding, e.g. 'text/html; charset=utf-8'
+    :type content_type: str
+    :param content_encoding: optional content encoding, this should be passed
+                             as 'gzip' if uploading gzipped content, else
+                             left blank
+    :type content_encoding: str or NoneType
+    :param content_disposition: optional content presentation, this should be
+                                used if the thing being uploaded is to be
+                                treated as a file download, e.g. a report...
+                                certain browsers need this particular header to
+                                be in place in order to correctly download the
+                                file with the desired filename. e.g. value:
+                                'attachment; filename=some-report.csv'
+    :type content_disposition: NoneType or str
+    :param acl: the access control level of the new object, by default this is
+                set to be 'private'
+    :type acl: str
+    :param cache_control: cache-control header to apply to the new object,
+                          'no-cache' by default
+    :type cache_control: str
+    :param cb: optional callback function to receive a single integer parameter
+               indicating the number of bytes uploaded, periodically called
+               as upload occurs.
+    :type cb: callable or NoneType
+    """
+    from botocore.exceptions import ClientError
+
+    if cb and not callable(cb):
+        raise ValueError('cb must be a callable!')
+
+    if isinstance(content, str):
+        # assume content is a file-name
+        content = open(content, 'rb')
+
+    elif hasattr(content, 'read') and callable(getattr(content, 'read')):
+        # assume content is a file-like object
+        content = open(content.name, 'rb')
+    else:
+        raise ValueError('content must be a file-path or a file-like object')
+
+    data = content.read()
+    content.close()
+
+    def default_cb(bytes_uploaded):
+        """
+        Default callback if no other callback is specified
+
+        :param bytes_uploaded: the number of bytes of the file uploaded
+        :type bytes_uploaded: int
+        """
+        print('Uploaded {bytes_uploaded} byte(s) of "{key}"'.format(
+            bytes_uploaded=bytes_uploaded,
+            key=key
+        ))
+
+    cb = cb or default_cb
+
+    client = s3_get_client()
+
+    params = {
+        'Bucket': bucket,
+        'Key': key,
+        'Body': data,
+        'ContentType': content_type,
+        'ACL': acl,
+        'CacheControl': cache_control,
+    }
+
+    if content_encoding:
+        params['ContentEncoding'] = content_encoding
+
+    if content_disposition:
+        params['ContentDisposition'] = content_disposition
+
+    try:
+        response = client.put_object(**params) or {}
+        status_code = dictattr(
+            response, 'ResponseMetadata.HTTPStatusCode', None)
+        if status_code == 200:
+            # note: put_object() does not accept a callback function, best
+            # we can do is call it once with 100% progress after the fact
+            cb(len(data))
+
+    except ClientError as e:
+        raise
 
 
 def s3_upload(key, data):
-    from boto.s3.key import Key
-    bucket = get_s3_bucket()
-    k = Key(bucket)
-    k.key = key
-    k.set_contents_from_file(data, rewind=True)
-    k.set_acl('public-read')
-    k.set_metadata('Content-Type', 'text/csv')
-    return k.generate_url(expires_in=0, query_auth=False)
+    """Should return URL of the file on S3"""
+    s3_put_object_from_file(
+        bucket=app_settings.S3_BUCKET,
+        key=key,
+        content=data,
+        content_type='text/csv'
+    )
+    return f'https://{app_settings.S3_BUCKET}.s3.amazonaws.com/{key}'
