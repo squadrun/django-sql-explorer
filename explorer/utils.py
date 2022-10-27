@@ -9,12 +9,23 @@ else:
 import re
 import string
 from explorer import app_settings
+from explorer.app_settings import (
+    EXPLORER_USE_SNOWFLAKE,
+    EXPLORER_SNOWFLAKE_USER,
+    EXPLORER_SNOWFLAKE_PASSWORD,
+    EXPLORER_SNOWFLAKE_ACCOUNT_IDENTIFIER,
+    EXPLORER_SNOWFLAKE_DATABASE,
+    EXPLORER_SNOWFLAKE_SCHEMA,
+    EXPLORER_SNOWFLAKE_ROLE,
+    EXPLORER_SNOWFLAKE_WAREHOUSE,
+)
 from django.db import connections, connection, DatabaseError
 from django.http import HttpResponse
 from six.moves import cStringIO
 from ago import human
 import sqlparse
 import datetime
+import snowflake.connector
 
 EXPLORER_PARAM_TOKEN = "$$"
 
@@ -30,6 +41,18 @@ def passes_blacklist(sql):
 
 
 def get_connection():
+    if EXPLORER_USE_SNOWFLAKE:
+        ctx = snowflake.connector.connect(
+            user=EXPLORER_SNOWFLAKE_USER,
+            password=EXPLORER_SNOWFLAKE_PASSWORD,
+            account=EXPLORER_SNOWFLAKE_ACCOUNT_IDENTIFIER,
+            database=EXPLORER_SNOWFLAKE_DATABASE,
+            schema=EXPLORER_SNOWFLAKE_SCHEMA,
+            role=EXPLORER_SNOWFLAKE_ROLE,
+            warehouse=EXPLORER_SNOWFLAKE_WAREHOUSE
+        )
+        return ctx
+    
     return connections[app_settings.EXPLORER_CONNECTION_NAME] if app_settings.EXPLORER_CONNECTION_NAME else connection
 
 
@@ -255,6 +278,9 @@ def check_replication_lag():
     :returns: True and the replication lag interval if it 
               exceeds 3 minutes, else returns False and None
     """
+    if EXPLORER_USE_SNOWFLAKE:
+        return False, None
+
     conn = get_connection()
     cursor = conn.cursor()
 

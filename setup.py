@@ -43,6 +43,7 @@ setup(
         'six>=1.10.0',
         # custom deps
         'ago==0.0.93',
+        'snowflake-connector-python==2.3.6',
         'future==0.18.2' # py2/3 compatible libraries
     ],
     include_package_data=True,
