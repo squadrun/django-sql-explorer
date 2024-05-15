@@ -13,9 +13,9 @@ def read(fname):
 
 setup(
     name = "django-sql-explorer-squad",
-    version = "0.9.25",
-    author = "Chris Clark",
-    author_email = "chris@untrod.com",
+    version = "0.9.28",
+    author = "Hemendra sharma",
+    author_email = "hemendra.sharma@squadstack.com",
     description = ("A pluggable app that allows users (admins) to execute SQL,"
                    " view, and export the results. Inspired by Stack Exchange Data Explorer."),
     license = "MIT",
@@ -31,6 +31,9 @@ setup(
         'Framework :: Django :: 1.7',
         'Framework :: Django :: 1.8',
         'Framework :: Django :: 1.9',
+        'Framework :: Django :: 1.10',
+        'Framework :: Django :: 1.11',
+        'Framework :: Django :: 2.0',
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
@@ -43,7 +46,7 @@ setup(
         'six>=1.10.0',
         # custom deps
         'ago==0.0.93',
-        'future==0.18.2' # py2/3 compatible libraries
+       
     ],
     include_package_data=True,
     zip_safe = False,
